@@ -47,7 +47,7 @@ button { font: inherit; }
 .voice-button span { margin-right: 8px; color: #743ed0; }.voice-button:hover { transform: translateY(-1px); background: #fff; }.voice-button:disabled { cursor: wait; opacity: .6; }
 .command-hint { margin-left: auto; padding: 0 12px; color: #77727c; font-size: .64rem; }
 .log-preview { width: min(100%, 640px); margin-top: 22px; padding: 13px 16px 4px; border: 1px solid #2b2731; border-radius: 10px; background: #0b0a0d9c; }
-.log-preview .section-heading { padding-bottom: 7px; }.log-preview .section-heading button { padding: 0; color: #a782ef; border: 0; background: transparent; font: inherit; font-size: .64rem; cursor: pointer; }.log-preview .section-heading button:hover { color: #d6c3ff; }
+.log-preview .section-heading { padding-bottom: 7px; }.log-preview .section-heading a { color: #a782ef; font-size: .64rem; }.log-preview .section-heading a:hover { color: #d6c3ff; }
 .log-preview .transcript { max-height: 118px; }
 
 .conversation { grid-column: 2; width: min(100%, 700px); margin: 0 auto 38px; padding: 0 30px; }

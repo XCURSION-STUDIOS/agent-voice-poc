@@ -6,13 +6,20 @@ import { VoiceClient, type VoiceStatus } from "./voiceClient";
 type Message = { role: "user" | "assistant"; text: string };
 type Tab = "voice" | "log" | "local" | "help";
 
+const tabFromHash = (): Tab => {
+  const value = window.location.hash.slice(1);
+  return ["voice", "log", "local", "help"].includes(value) ? (value as Tab) : "voice";
+};
+
 export default function App() {
   const [status, setStatus] = useState<VoiceStatus>("disconnected");
   const [messages, setMessages] = useState<Message[]>([]);
-  const [tab, setTab] = useState<Tab>("voice");
+  const [tab, setTab] = useState<Tab>(tabFromHash);
   const client = useRef<VoiceClient | null>(null);
 
-  useEffect(() => {
+  const getVoiceClient = () => {
+    if (client.current) return client.current;
+
     client.current = new VoiceClient({
       onStatus: setStatus,
       onTranscript: (role, text) => {
@@ -20,12 +27,22 @@ export default function App() {
         if (role === "user") setStatus("thinking");
       },
     });
+    return client.current;
+  };
+
+  useEffect(() => {
     return () => void client.current?.disconnect();
+  }, []);
+
+  useEffect(() => {
+    const syncTabWithUrl = () => setTab(tabFromHash());
+    window.addEventListener("hashchange", syncTabWithUrl);
+    return () => window.removeEventListener("hashchange", syncTabWithUrl);
   }, []);
 
   const toggleConversation = async () => {
     try {
-      if (["disconnected", "error"].includes(status)) await client.current?.connect();
+      if (["disconnected", "error"].includes(status)) await getVoiceClient().connect();
       else await client.current?.disconnect();
     } catch (error) {
       console.error(error);
@@ -38,12 +55,12 @@ export default function App() {
       <aside className="rail" aria-label="Voice assistant navigation">
         <a className="mark" href="#voice" aria-label="Jarvis home">≫</a>
         <nav>
-          <button className={`rail-item ${tab === "voice" ? "active" : ""}`} onClick={() => setTab("voice")} aria-pressed={tab === "voice"}><span>◉</span><small>voice</small></button>
-          <button className={`rail-item ${tab === "log" ? "active" : ""}`} onClick={() => setTab("log")} aria-pressed={tab === "log"}><span>⌁</span><small>log</small></button>
+          <a className={`rail-item ${tab === "voice" ? "active" : ""}`} href="#voice" onClick={() => setTab("voice")} aria-current={tab === "voice" ? "page" : undefined}><span>◉</span><small>voice</small></a>
+          <a className={`rail-item ${tab === "log" ? "active" : ""}`} href="#log" onClick={() => setTab("log")} aria-current={tab === "log" ? "page" : undefined}><span>⌁</span><small>log</small></a>
         </nav>
         <div className="rail-bottom">
-          <button className={`rail-item ${tab === "local" ? "active" : ""}`} onClick={() => setTab("local")} aria-pressed={tab === "local"}><span>⚙</span><small>local</small></button>
-          <button className={`rail-item ${tab === "help" ? "active" : ""}`} onClick={() => setTab("help")} aria-pressed={tab === "help"}><span>?</span><small>help</small></button>
+          <a className={`rail-item ${tab === "local" ? "active" : ""}`} href="#local" onClick={() => setTab("local")} aria-current={tab === "local" ? "page" : undefined}><span>⚙</span><small>local</small></a>
+          <a className={`rail-item ${tab === "help" ? "active" : ""}`} href="#help" onClick={() => setTab("help")} aria-current={tab === "help" ? "page" : undefined}><span>?</span><small>help</small></a>
         </div>
       </aside>
 
@@ -64,7 +81,7 @@ export default function App() {
         </div>
         {messages.length > 0 && (
           <section className="log-preview" aria-label="Recent conversation">
-            <div className="section-heading"><span>recent log</span><button type="button" onClick={() => setTab("log")}>view full log</button></div>
+            <div className="section-heading"><span>recent log</span><a href="#log">view full log</a></div>
             <div className="transcript">
               {messages.slice(-3).map((message, index) => (
                 <p key={`preview-${message.role}-${messages.length - 3 + index}`} className={message.role}>
