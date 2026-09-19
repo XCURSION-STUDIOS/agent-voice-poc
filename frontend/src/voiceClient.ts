@@ -10,9 +10,20 @@ export type VoiceStatus =
   | "interrupted"
   | "error";
 
+export type ToolTrace = {
+  id: string;
+  name: string;
+  arguments?: Record<string, unknown>;
+  result?: unknown;
+  status: "started" | "running" | "completed" | "cancelled";
+  startedAt: number;
+  finishedAt?: number;
+};
+
 type Callbacks = {
   onStatus: (status: VoiceStatus) => void;
   onTranscript: (role: "user" | "assistant", text: string) => void;
+  onToolTrace: (trace: ToolTrace) => void;
 };
 
 /** Browser-only bridge. It knows WebRTC, never provider credentials. */
@@ -54,6 +65,62 @@ export class VoiceClient {
         },
         onBotOutput: (data: { text?: string; spoken?: boolean }) => {
           if (data.spoken && data.text) callbacks.onTranscript("assistant", data.text);
+        },
+        onLLMFunctionCallStarted: (data: { function_name?: string }) => {
+          if (!data.function_name) return;
+          callbacks.onToolTrace({
+            id: `pending-${Date.now()}`,
+            name: data.function_name,
+            status: "started",
+            startedAt: Date.now(),
+          });
+        },
+        onLLMFunctionCallInProgress: (data: {
+          function_name?: string;
+          tool_call_id: string;
+          arguments?: Record<string, unknown>;
+        }) => {
+          if (!data.function_name) return;
+          callbacks.onToolTrace({
+            id: data.tool_call_id,
+            name: data.function_name,
+            arguments: data.arguments,
+            status: "running",
+            startedAt: Date.now(),
+          });
+        },
+        // Older RTVI servers emit the legacy function-call event instead of
+        // the newer started/in-progress pair. Keep it as a compatibility path
+        // so tool activity remains visible across Pipecat versions.
+        onLLMFunctionCall: (data: {
+          function_name?: string;
+          tool_call_id: string;
+          args: Record<string, unknown>;
+        }) => {
+          if (!data.function_name) return;
+          callbacks.onToolTrace({
+            id: data.tool_call_id,
+            name: data.function_name,
+            arguments: data.args,
+            status: "running",
+            startedAt: Date.now(),
+          });
+        },
+        onLLMFunctionCallStopped: (data: {
+          function_name?: string;
+          tool_call_id: string;
+          cancelled: boolean;
+          result?: unknown;
+        }) => {
+          if (!data.function_name) return;
+          callbacks.onToolTrace({
+            id: data.tool_call_id,
+            name: data.function_name,
+            result: data.result,
+            status: data.cancelled ? "cancelled" : "completed",
+            startedAt: Date.now(),
+            finishedAt: Date.now(),
+          });
         },
       },
     });

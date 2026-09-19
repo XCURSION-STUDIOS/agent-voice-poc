@@ -10,6 +10,8 @@ A deliberately small, provider-configurable, real-time voice assistant built on 
 - **Context:** Pipecat's in-session `LLMContext` retains the conversation and disappears on disconnect.
 - **Calendar specialist:** Calendar tools are registered on a per-session `CalendarAgent`. When
   `NOTION_API_KEY` and `NOTION_DATABASE_ID` are configured, it reads and creates records in the Content Calendar data source using the `Film date` property used by the database's Calendar view.
+- **Live clock:** The `get_current_datetime` tool provides the current date and time in `USER_TIMEZONE`. The assistant uses it for "today", "now", tomorrow, and other relative-date requests instead of guessing.
+- Spoken calendar times without an explicit offset are interpreted in `USER_TIMEZONE` before being sent to Notion, so saying “12 PM” does not silently become a UTC time.
 
 ## Prerequisites
 
@@ -45,6 +47,14 @@ Open the Vite address (normally http://localhost:5173), allow microphone access,
 
 To switch back to Deepgram Aura, set `TTS_PROVIDER=deepgram` and choose a `DEEPGRAM_TTS_VOICE`. To tune the OpenAI option, change `OPENAI_TTS_VOICE` or `OPENAI_TTS_INSTRUCTIONS`, then restart the backend.
 
+Set the timezone used for calendar interpretation and current-time answers with an IANA timezone name, for example:
+
+```powershell
+USER_TIMEZONE=Asia/Singapore
+```
+
+After changing it, restart the backend.
+
 ## Test the calendar agent directly
 
 You can test Notion event creation without starting the voice client:
@@ -64,6 +74,35 @@ uv run python -m scripts.test_calendar_agent `
   --title "Record YouTube video" `
   --start "2026-09-21T14:00:00+08:00" `
   --end "2026-09-21T15:00:00+08:00"
+```
+
+## Todo agent
+
+The voice assistant can also work with the existing Todo List database. Try commands such as:
+
+- “Add buy groceries to my todo list.”
+- “What tasks are still not started?”
+- “Mark the groceries task as done.”
+- “Change the priority of the video task to high.”
+- “Add a note to the groceries task: get oat milk too.”
+- “Remove the duplicate task.”
+
+The Todo agent uses `Task name`, `Status`, `Details`, `Due date`, `Priority`, `Category/Project`, and `Estimated time`. It asks for confirmation before completing or archiving a task, and it identifies matching tasks before modifying one.
+
+You can also test it directly:
+
+```powershell
+cd backend
+uv run python -m scripts.test_task_agent list
+uv run python -m scripts.test_task_agent create --title "Buy groceries" --priority High
+```
+
+Use the page ID printed by `list` for later operations:
+
+```powershell
+uv run python -m scripts.test_task_agent complete --task-id PAGE_ID
+uv run python -m scripts.test_task_agent note --task-id PAGE_ID --note "Buy oat milk too"
+uv run python -m scripts.test_task_agent archive --task-id PAGE_ID
 ```
 
 ## Measurement

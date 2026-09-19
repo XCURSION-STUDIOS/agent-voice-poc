@@ -1,19 +1,21 @@
 import { useEffect, useRef, useState } from "react";
 import { AssistantStatus } from "./components/AssistantStatus";
 import { VoiceButton } from "./components/VoiceButton";
-import { VoiceClient, type VoiceStatus } from "./voiceClient";
+import { ToolTracePanel } from "./components/ToolTracePanel";
+import { VoiceClient, type ToolTrace, type VoiceStatus } from "./voiceClient";
 
 type Message = { role: "user" | "assistant"; text: string };
-type Tab = "voice" | "log" | "local" | "help";
+type Tab = "voice" | "log" | "tools" | "local" | "help";
 
 const tabFromHash = (): Tab => {
   const value = window.location.hash.slice(1);
-  return ["voice", "log", "local", "help"].includes(value) ? (value as Tab) : "voice";
+  return ["voice", "log", "tools", "local", "help"].includes(value) ? (value as Tab) : "voice";
 };
 
 export default function App() {
   const [status, setStatus] = useState<VoiceStatus>("disconnected");
   const [messages, setMessages] = useState<Message[]>([]);
+  const [toolTraces, setToolTraces] = useState<ToolTrace[]>([]);
   const [tab, setTab] = useState<Tab>(tabFromHash);
   const client = useRef<VoiceClient | null>(null);
 
@@ -25,6 +27,19 @@ export default function App() {
       onTranscript: (role, text) => {
         setMessages((current) => [...current, { role, text }]);
         if (role === "user") setStatus("thinking");
+      },
+      onToolTrace: (trace) => {
+        setToolTraces((current) => {
+          const index = current.findIndex((item) => item.id === trace.id);
+          const pendingIndex = index === -1 && trace.status === "running"
+            ? current.findIndex((item) => item.name === trace.name && item.status === "started")
+            : -1;
+          const resolvedIndex = index === -1 ? pendingIndex : index;
+          if (resolvedIndex === -1) return [...current, trace];
+          const next = [...current];
+          next[resolvedIndex] = { ...next[resolvedIndex], ...trace, id: trace.id };
+          return next;
+        });
       },
     });
     return client.current;
@@ -57,6 +72,7 @@ export default function App() {
         <nav>
           <a className={`rail-item ${tab === "voice" ? "active" : ""}`} href="#voice" onClick={() => setTab("voice")} aria-current={tab === "voice" ? "page" : undefined}><span>◉</span><small>voice</small></a>
           <a className={`rail-item ${tab === "log" ? "active" : ""}`} href="#log" onClick={() => setTab("log")} aria-current={tab === "log" ? "page" : undefined}><span>⌁</span><small>log</small></a>
+          <a className={`rail-item ${tab === "tools" ? "active" : ""}`} href="#tools" onClick={() => setTab("tools")} aria-current={tab === "tools" ? "page" : undefined}><span>↯</span><small>tools</small></a>
         </nav>
         <div className="rail-bottom">
           <a className={`rail-item ${tab === "local" ? "active" : ""}`} href="#local" onClick={() => setTab("local")} aria-current={tab === "local" ? "page" : undefined}><span>⚙</span><small>local</small></a>
@@ -107,6 +123,8 @@ export default function App() {
         )}
       </section>
       }
+
+      {tab === "tools" && <ToolTracePanel traces={toolTraces} />}
 
       {tab === "local" && <section className="panel info-panel">
         <div className="section-heading"><span>local pipeline</span><span>connected services</span></div>

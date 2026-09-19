@@ -13,6 +13,7 @@ from pipecat.processors.aggregators.llm_response_universal import (
     LLMContextAggregatorPair,
     LLMUserAggregatorParams,
 )
+from pipecat.processors.frameworks.rtvi import RTVIFunctionCallReportLevel, RTVIObserverParams
 from pipecat.runner.types import RunnerArguments
 from pipecat.runner.utils import create_transport
 from pipecat.transports.base_transport import BaseTransport, TransportParams
@@ -78,6 +79,9 @@ async def run_bot(transport: BaseTransport, runner_args: RunnerArguments) -> Non
             _latency_observer(),
         ],
         processor_unusable_policy=ProcessorUnusablePolicy.END,
+        rtvi_observer_params=RTVIObserverParams(
+            function_call_report_level={"*": RTVIFunctionCallReportLevel.FULL}
+        ),
     )
     runner = WorkerRunner(handle_sigint=runner_args.handle_sigint)
     await runner.add_workers(worker)
