@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import asyncio
 import json
+from urllib.error import HTTPError, URLError
 from urllib.request import Request, urlopen
 from datetime import datetime
 from typing import Any
@@ -132,12 +133,18 @@ def _parse_datetime(value: str | None) -> datetime | None:
 
 
 def _overlaps(event: CalendarEvent, start: datetime, end: datetime) -> bool:
-    event_start = event.starts_at
-    event_end = event.ends_at
-    if event_start.tzinfo is None and start.tzinfo is not None:
-        event_start = event_start.replace(tzinfo=start.tzinfo)
-        event_end = event_end.replace(tzinfo=start.tzinfo)
-    return event_start < end and event_end > start
+    event_start, range_end = _align_datetimes(event.starts_at, end)
+    event_end, range_start = _align_datetimes(event.ends_at, start)
+    return event_start < range_end and event_end > range_start
+
+
+def _align_datetimes(left: datetime, right: datetime) -> tuple[datetime, datetime]:
+    """Make Notion date-only values safe to compare with zoned datetimes."""
+    if left.tzinfo is None and right.tzinfo is not None:
+        left = left.replace(tzinfo=right.tzinfo)
+    elif left.tzinfo is not None and right.tzinfo is None:
+        right = right.replace(tzinfo=left.tzinfo)
+    return left, right
 
 
 def _request_json(
@@ -149,5 +156,11 @@ def _request_json(
         headers=headers,
         data=json.dumps(payload).encode("utf-8") if payload is not None else None,
     )
-    with urlopen(request, timeout=15) as response:
-        return json.loads(response.read().decode("utf-8"))
+    try:
+        with urlopen(request, timeout=15) as response:
+            return json.loads(response.read().decode("utf-8"))
+    except HTTPError as exc:
+        details = exc.read().decode("utf-8", errors="replace")
+        raise RuntimeError(f"Notion API returned HTTP {exc.code}: {details}") from exc
+    except URLError as exc:
+        raise RuntimeError(f"Could not reach the Notion API: {exc.reason}") from exc

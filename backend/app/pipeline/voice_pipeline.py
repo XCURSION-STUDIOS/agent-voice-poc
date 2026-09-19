@@ -23,7 +23,10 @@ from pipecat.workers.runner import WorkerRunner
 from app.config.settings import get_settings
 from app.agents.calendar_agent import CalendarAgent, InMemoryCalendarStore
 from app.agents.calendar_tools import build_calendar_tools
+from app.agents.task_agent import InMemoryTaskStore, TaskAgent
+from app.agents.task_tools import build_task_tools
 from app.integrations.notion_calendar import NotionCalendarStore
+from app.integrations.notion_todo import NotionTodoStore
 from app.pipeline.providers import create_llm, create_stt, create_tts
 
 
@@ -34,7 +37,10 @@ async def run_bot(transport: BaseTransport, runner_args: RunnerArguments) -> Non
     # Create specialists per voice session so state and pending confirmations
     # never leak between users.
     calendar_agent = CalendarAgent(_calendar_store(settings))
-    context = LLMContext(tools=build_calendar_tools(calendar_agent))
+    task_agent = TaskAgent(_task_store(settings))
+    context = LLMContext(
+        tools=build_calendar_tools(calendar_agent, settings.user_timezone) + build_task_tools(task_agent)
+    )
     user_aggregator, assistant_aggregator = LLMContextAggregatorPair(
         context,
         user_params=LLMUserAggregatorParams(
@@ -96,6 +102,16 @@ def _calendar_store(settings):
             date_property=settings.notion_calendar_date_property,
         )
     return InMemoryCalendarStore()
+
+
+def _task_store(settings):
+    if settings.notion_api_key:
+        return NotionTodoStore(
+            settings.notion_api_key.get_secret_value(),
+            settings.notion_todo_database_id,
+            settings.notion_todo_data_source_id,
+        )
+    return InMemoryTaskStore()
 
 
 def _latency_observer() -> UserBotLatencyObserver:

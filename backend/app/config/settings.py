@@ -34,12 +34,15 @@ class Settings(BaseSettings):
     deepgram_tts_voice: str = "aura-2-arcas-en"
 
     min_start_words: int = 2
+    user_timezone: str = "Asia/Singapore"
 
     # Reserved for the Notion adapter. The first calendar slice uses an
     # in-memory store until the workspace schema is configured.
     notion_api_key: SecretStr | None = None
     notion_database_id: str | None = None
     notion_calendar_date_property: str = "Film date"
+    notion_todo_database_id: str = "3e0e658e-ecdc-805a-ae57-cf01327f1eec"
+    notion_todo_data_source_id: str = "3e0e658e-ecdc-804d-9df6-000b7c1e6379"
 
     def required_secret(self, value: SecretStr | None, name: str) -> str:
         if value is None or not value.get_secret_value():
