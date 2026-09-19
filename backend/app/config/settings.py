@@ -35,6 +35,12 @@ class Settings(BaseSettings):
 
     min_start_words: int = 2
 
+    # Reserved for the Notion adapter. The first calendar slice uses an
+    # in-memory store until the workspace schema is configured.
+    notion_api_key: SecretStr | None = None
+    notion_database_id: str | None = None
+    notion_calendar_date_property: str = "Film date"
+
     def required_secret(self, value: SecretStr | None, name: str) -> str:
         if value is None or not value.get_secret_value():
             raise ValueError(f"{name} is required for the selected provider")

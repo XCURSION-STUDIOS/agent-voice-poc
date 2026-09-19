@@ -21,6 +21,9 @@ from pipecat.turns.user_turn_strategies import UserTurnStrategies
 from pipecat.workers.runner import WorkerRunner
 
 from app.config.settings import get_settings
+from app.agents.calendar_agent import CalendarAgent, InMemoryCalendarStore
+from app.agents.calendar_tools import build_calendar_tools
+from app.integrations.notion_calendar import NotionCalendarStore
 from app.pipeline.providers import create_llm, create_stt, create_tts
 
 
@@ -28,7 +31,10 @@ async def run_bot(transport: BaseTransport, runner_args: RunnerArguments) -> Non
     settings = get_settings()
     stt, llm, tts = create_stt(settings), create_llm(settings), create_tts(settings)
 
-    context = LLMContext()
+    # Create specialists per voice session so state and pending confirmations
+    # never leak between users.
+    calendar_agent = CalendarAgent(_calendar_store(settings))
+    context = LLMContext(tools=build_calendar_tools(calendar_agent))
     user_aggregator, assistant_aggregator = LLMContextAggregatorPair(
         context,
         user_params=LLMUserAggregatorParams(
@@ -80,6 +86,16 @@ async def run_bot(transport: BaseTransport, runner_args: RunnerArguments) -> Non
         await runner.cancel()
 
     await runner.run()
+
+
+def _calendar_store(settings):
+    if settings.notion_api_key and settings.notion_database_id:
+        return NotionCalendarStore(
+            settings.notion_api_key.get_secret_value(),
+            settings.notion_database_id,
+            date_property=settings.notion_calendar_date_property,
+        )
+    return InMemoryCalendarStore()
 
 
 def _latency_observer() -> UserBotLatencyObserver:
